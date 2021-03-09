@@ -178,7 +178,19 @@ def _ts_project_impl(ctx):
     # However tsc will copy .json srcs to the output tree so we want to declare these outputs to include along with .js Default outs
     # NB: We don't have emit_declaration_only setting here, so use presence of any JS outputs as an equivalent.
     # tsc will only produce .json if it also produces .js
-    if len(ctx.outputs.js_outs):
+    if True:
+        js_outs = []
+        typings_outs = []
+        for src in ctx.files.srcs:
+            # if src.basename.endswith(".js")
+            js_outs.append(ctx.actions.declare_file(_join(ctx.attr.out_dir, src.basename.replace(".ts",".js"))))
+            if True:
+                typings_outs.append(ctx.actions.declare_file(_join(ctx.attr.out_dir, src.basename.replace(".ts",".d.ts"))))
+    else:
+        js_outs = ctx.outputs.js_outs
+        typings_outs = []
+
+    if len(js_outs):
         json_outs = [
             ctx.actions.declare_file(_join(ctx.attr.out_dir, src.short_path[len(ctx.label.package) + 1:]))
             for src in ctx.files.srcs
@@ -187,15 +199,15 @@ def _ts_project_impl(ctx):
     else:
         json_outs = []
 
-    outputs = json_outs + ctx.outputs.js_outs + ctx.outputs.map_outs + ctx.outputs.typings_outs + ctx.outputs.typing_maps_outs
+    outputs = json_outs + js_outs + ctx.outputs.map_outs + ctx.outputs.typings_outs + ctx.outputs.typing_maps_outs + typings_outs
     if ctx.outputs.buildinfo_out:
         arguments.add_all([
             "--tsBuildInfoFile",
             ctx.outputs.buildinfo_out.path,
         ])
         outputs.append(ctx.outputs.buildinfo_out)
-    runtime_outputs = json_outs + ctx.outputs.js_outs + ctx.outputs.map_outs
-    typings_outputs = ctx.outputs.typings_outs + ctx.outputs.typing_maps_outs + [s for s in ctx.files.srcs if s.path.endswith(".d.ts")]
+    runtime_outputs = json_outs + js_outs + ctx.outputs.map_outs
+    typings_outputs = ctx.outputs.typings_outs + ctx.outputs.typing_maps_outs + [s for s in ctx.files.srcs if s.path.endswith(".d.ts")] + typings_outs
     default_outputs_depset = depset(runtime_outputs) if len(runtime_outputs) else depset(typings_outputs)
 
     if len(outputs) > 0:
@@ -666,13 +678,6 @@ def ts_project_macro(
         typings_outs.extend(_out_paths(srcs, typings_out_dir, root_dir, allow_js, ".d.ts"))
     if declaration_map:
         typing_maps_outs.extend(_out_paths(srcs, typings_out_dir, root_dir, allow_js, ".d.ts.map"))
-
-    if not len(js_outs) and not len(typings_outs):
-        fail("""ts_project target "//{}:{}" is configured to produce no outputs.
-
-Note that ts_project must know the srcs in advance in order to predeclare the outputs.
-Check the srcs attribute to see that some .ts files are present (or .js files with allow_js=True).
-""".format(native.package_name(), name))
 
     ts_project(
         name = name,

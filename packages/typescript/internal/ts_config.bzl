@@ -121,7 +121,7 @@ def write_tsconfig(name, config, files, out, extends = None):
         config["extends"] = "__extends__"
 
     amended_config = struct(
-        files = "__files__",
+        # files = "__files__",
         **config
     )
     write_tsconfig_rule(
